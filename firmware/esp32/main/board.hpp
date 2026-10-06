@@ -55,6 +55,7 @@ struct AmoledConfig {
 struct I2cBusConfig {
   int sda = -1, scl = -1;
   uint32_t hz = 400000;
+  bool internal_pullup = true;
 };
 
 // ES8311/AW88298 (speaker) and ES7210 (microphone ADC) sharing one duplex I2S bus,
@@ -68,6 +69,9 @@ struct CodecAudioConfig {
   float amp_supply_v = 5.0f;  // amplifier supply; the ES8311 driver sets its output level from it
   float mic_gain_db = 24.0f;
   SpeakerCodec speaker = SpeakerCodec::Es8311;
+  // The StickS3 uses one ES8311 for both capture and playback instead of a
+  // separate ES7210 microphone ADC. Its I2S link has two slots.
+  bool duplex_es8311 = false;
 };
 
 // Capacitive touch on the I2C bus: hold to talk, tap, swipe down to cancel.

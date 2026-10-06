@@ -118,16 +118,28 @@ hg::json::Value wifi() {
 hg::json::Value i2c_scan() {
   hg::json::Value found = hg::json::Value::array();
   if (!g_parts.i2c) return found;
-  for (uint16_t addr = 0x08; addr < 0x78; ++addr) {
-    esp_err_t err = i2c_master_probe(g_parts.i2c, addr, 10);
-    if (err == ESP_ERR_TIMEOUT) {
-      found.push("bus stuck");  // a line held low: every other address would time out too
-      break;
-    }
+  auto probe = [&](uint8_t addr, int attempts) {
+    esp_err_t err = ESP_FAIL;
+    for (int attempt = 0; attempt < attempts && err != ESP_OK; ++attempt)
+      err = i2c_master_probe(g_parts.i2c, addr, 10);
     if (err == ESP_OK) {
       char buf[8];
       std::snprintf(buf, sizeof(buf), "0x%02x", addr);
       found.push(buf);
+    } else if (err == ESP_ERR_TIMEOUT) {
+      found.push("bus stuck");
+    }
+    return err;
+  };
+  if (g_parts.i2c_addresses) {
+    for (size_t i = 0; i < g_parts.i2c_address_count; ++i)
+      probe(g_parts.i2c_addresses[i], 3);
+    return found;
+  }
+  for (uint16_t addr = 0x08; addr < 0x78; ++addr) {
+    esp_err_t err = probe(static_cast<uint8_t>(addr), 1);
+    if (err == ESP_ERR_TIMEOUT) {
+      break;
     }
   }
   return found;

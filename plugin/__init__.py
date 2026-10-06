@@ -50,17 +50,20 @@ def _parse_target(raw: str):
 
 
 def register(ctx) -> None:
+    from dataclasses import fields
+
+    from gateway.platform_registry import PlatformEntry
+
     from . import cli
     from .tools import register_tools
 
-    ctx.register_platform(
+    platform_options = dict(
         name="gadget",
         label="Hermes Gadget",
         adapter_factory=_make_adapter,
         check_fn=check_requirements,
         is_connected=_is_connected,
         setup_fn=_setup,
-        parse_target_ref_fn=_parse_target,
         install_hint="websockets is a core Hermes dependency; reinstall Hermes if it is missing",
         allowed_users_env="GADGET_ALLOWED_USERS",
         allow_all_env="GADGET_ALLOW_ALL_USERS",
@@ -70,6 +73,12 @@ def register(ctx) -> None:
         allow_update_command=False,
         platform_hint=PLATFORM_HINT,
     )
+    # Hermes versions before target-parser hooks still support the gadget
+    # platform itself. Register the optional hook only when their platform
+    # registry exposes it, rather than making the whole plugin fail to load.
+    if any(field.name == "parse_target_ref_fn" for field in fields(PlatformEntry)):
+        platform_options["parse_target_ref_fn"] = _parse_target
+    ctx.register_platform(**platform_options)
     register_tools(ctx)
     ctx.register_cli_command(
         name="gadget",

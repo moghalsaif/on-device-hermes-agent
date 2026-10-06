@@ -24,6 +24,7 @@ idf_component_register(
         "../../drivers/axp2101.cpp"
         "../../drivers/cores3.cpp"
         "port_storage.cpp"
+        "port_sticks3.cpp"
         "port_system.cpp"
         "port_touch.cpp"
         "port_wifi.cpp"

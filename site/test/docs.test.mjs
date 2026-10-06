@@ -9,7 +9,7 @@ test("published guides keep links to guides, anchors, images, and repository fil
   assert.equal(docLink("desktop.md#windows"), "desktop.html#windows");
   assert.equal(docLink("tailscale-funnel.md#connect-the-gadget"), "tailscale-funnel.html#connect-the-gadget");
   assert.equal(docLink("images/screen-ready.png"), "images/screen-ready.png");
-  assert.equal(docLink("../python/hermes_gadget/sim/window.py"), "https://github.com/Adolanium/hermes-gadget-sdk/blob/main/python/hermes_gadget/sim/window.py");
+  assert.equal(docLink("../python/hermes_gadget/sim/window.py"), "https://github.com/moghalsaif/on-device-hermes-agent/blob/main/python/hermes_gadget/sim/window.py");
   assert.equal(docLink("https://example.com/a.md"), "https://example.com/a.md");
   assert.equal(docLink("#ready"), "#ready");
   const html = renderDoc("desktop", '# Try it\n\n## Build\n\n[Windows](desktop.md#windows)\n\n## Build\n\n```bash\necho "<ready>"\n```');

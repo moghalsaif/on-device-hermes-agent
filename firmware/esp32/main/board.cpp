@@ -18,6 +18,8 @@ namespace {
 #define HG_BOARD_NAME "esp32-s3-box-3"
 #elif CONFIG_HG_BOARD_CORES3
 #define HG_BOARD_NAME "m5stack-cores3"
+#elif CONFIG_HG_BOARD_STICKS3
+#define HG_BOARD_NAME "m5stack-sticks3"
 #elif CONFIG_HG_BOARD_T_DISPLAY_S3
 #define HG_BOARD_NAME "tdisplay-s3"
 #elif CONFIG_HG_BOARD_WS_ESP32S3_LCD_154
@@ -97,6 +99,56 @@ BoardConfig make() {
   b.pwr_key = {};  // This model has no TCA9554. PWR retains its hardware role.
   b.axp_audio_supply = true;  // ALDO1 supplies the analog audio circuit.
 #endif
+  return b;
+}
+#elif CONFIG_HG_BOARD_STICKS3
+// M5Stack M5StickS3:
+// 135x240 ST7789 LCD, ES8311 duplex audio, M5PM1 PMIC and two buttons.
+BoardConfig make() {
+  BoardConfig b{};
+  b.name = kBoardName;
+
+  // ST7789 LCD
+  b.lcd.enabled = true;
+  b.lcd.width = 135;
+  b.lcd.height = 240;
+  b.lcd.swap_xy = false;
+  b.lcd.mirror_x = false;
+  b.lcd.mirror_y = false;
+  b.lcd.invert = true;
+  b.lcd.gap_x = 52;
+  b.lcd.gap_y = 40;
+  b.lcd.mosi = 39;
+  b.lcd.sclk = 40;
+  b.lcd.cs = 41;
+  b.lcd.dc = 45;
+  b.lcd.rst = 21;
+  b.lcd.backlight = 38;
+
+  // M5PM1 + ES8311 control bus
+  // External pull-ups are fitted. The M5PM1 is specified at 100 kHz and can
+  // intermittently NACK, so its board driver retries register transfers.
+  b.i2c = {47, 48, 100000, false};
+
+  // ES8311 duplex I2S
+  b.codec.enabled = true;
+  b.codec.mclk = 18;
+  b.codec.bclk = 17;
+  b.codec.ws = 15;
+  b.codec.dout = 14;
+  b.codec.din = 16;
+
+  // AW8737 amp enable is M5PM1 GPIO3. StickS3Board::audio_gpio() routes the
+  // codec driver's PA operations to the PMIC instead of an ESP32 GPIO.
+  b.codec.pa = 3;
+  b.codec.speaker = SpeakerCodec::Es8311;
+  b.codec.duplex_es8311 = true;
+
+  // KEY1 = push-to-talk, KEY2 = cancel.
+  b.buttons = {11, 12, -1, -1};
+  b.talk_label = "TALK";
+  b.cancel_label = "AUX";
+
   return b;
 }
 #elif CONFIG_HG_BOARD_WS_ESP32S3_LCD_154

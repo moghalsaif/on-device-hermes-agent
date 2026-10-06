@@ -138,6 +138,29 @@ Before relying on the port, run the [physical checklist](hardware-validation.md)
 
 References: [M5Stack hardware and recovery instructions](https://docs.m5stack.com/en/core/CoreS3), [Espressif board definitions](https://github.com/espressif/esp-bsp/tree/master/bsp/m5stack_core_s3), [AW9523 registers](https://m5stack.oss-cn-shenzhen.aliyuncs.com/resource/docs/products/core/CoreS3/AW9523B-EN.pdf), and [AXP2101 registers](https://files.waveshare.com/wiki/common/X-power-AXP2101_SWcharge_V1.0.pdf). See [README](../README.md#license) for driver licenses and the adapted ILI9342E table's notice.
 
+## M5Stack M5StickS3
+
+Use `m5stack-sticks3` for the M5StickS3 K150 with 8 MB flash and 8 MB octal PSRAM. StickC, StickC Plus and StickC Plus2 need different profiles. This port is experimental until the full physical checklist is recorded.
+
+| Part | Connection |
+|---|---|
+| 135×240 ST7789 LCD | SPI MOSI 39, clock 40, CS 41, DC 45, reset 21, backlight 38; gap (52, 40) |
+| ES8311 microphone/speaker codec | I2C 0x18; I2S MCLK 18, BCLK 17, WS 15, DOUT 14, DIN 16 |
+| M5PM1 power controller | I2C 0x6E at 100 kHz; GPIO2 powers LCD/audio, GPIO3 enables the AW8737 amplifier |
+| I2C bus | SDA 47, SCL 48; external pull-ups |
+| Buttons (to GND) | Front TALK = GPIO 11; side AUX/CANCEL = GPIO 12 |
+
+The M5PM1 occasionally NACKs a transfer, so its driver retries register access and waits for the LCD/audio rail to settle before starting the peripherals. Diagnostics probe only the two known I2C addresses because an exhaustive scan can upset this controller. The ES8311 carries both microphone and speaker audio in two-slot I2S; firmware converts that stream to the mono audio used by Hermes. M5PM1 GPIO3 enables the AW8737 when the codec opens, and the ES8311 DAC is muted between replies.
+
+```bash
+cd firmware/esp32
+pio run -e m5stack-sticks3 -t upload --upload-port /dev/cu.usbmodem101
+```
+
+The USB-C port provides native USB Serial/JTAG for flashing and the 115200-baud console. On first boot, `diag` should report display `st7789`, microphone and speaker `es8311`, and I2C addresses `0x18` and `0x6e`. Check that the portrait image is upright, the front button records while held, the side button cancels, speech is transcribed, and replies play without idle hiss. Battery measurements and firmware power-off are not implemented yet.
+
+Pins and power behavior follow the [M5Stack StickS3 documentation](https://docs.m5stack.com/en/core/StickS3) and K150 v0.6 schematic. The port uses ESP-IDF's existing display and codec components; no vendor driver source is incorporated.
+
 ## ESP32-S3-Touch-AMOLED-1.75C
 
 Use `esp32s3-touch-amoled-175c` for SKUs 33691/33692, the enclosed model with 32 MB flash and 8 MB octal PSRAM. This is an experimental port. Use its exact image; the 1.75 model's image has different pins.

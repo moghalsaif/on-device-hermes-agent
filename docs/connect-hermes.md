@@ -5,7 +5,7 @@ Use your own Hermes Agent for replies, tools, memory, and skills. Run the comman
 ## 1. Install the plugin
 
 ```bash
-hermes plugins install https://github.com/Adolanium/hermes-gadget-sdk/tree/main/plugin --enable
+hermes plugins install https://github.com/moghalsaif/on-device-hermes-agent/tree/main/plugin --enable
 hermes gateway setup
 ```
 
@@ -13,7 +13,7 @@ Choose **Hermes Gadget**. Restart the gateway when setup asks. Setup prints a de
 
 **You know it worked when:** `hermes gadget info` shows the gadget configuration and device URL. Keep the gateway running so devices can connect.
 
-The command installs from `main`. To match a firmware release, use the command in the [release notes](https://github.com/Adolanium/hermes-gadget-sdk/releases), which pins the plugin with `--ref`.
+The command installs from `main`. To match an upstream firmware release instead, use the command in the [upstream release notes](https://github.com/Adolanium/hermes-gadget-sdk/releases), which pins the plugin with `--ref`.
 
 ## 2. Connect a device
 

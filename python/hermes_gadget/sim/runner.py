@@ -44,6 +44,8 @@ class Board:
 BOARDS = {
     "sim-320x240": Board("sim-320x240", 320, 240),
     "sim-240x135": Board("sim-240x135", 240, 135),
+    # M5Stack StickS3 portrait display with TALK and CANCEL, but no scroll keys.
+    "sim-135x240": Board("sim-135x240", 135, 240, scroll_buttons=False),
     "sim-480x320": Board("sim-480x320", 480, 320),
     "sim-240x240-nospeaker": Board("sim-240x240-nospeaker", 240, 240, speaker=False),
     # A 1.54" 240x240 SPI LCD with codecs (e.g. Waveshare ESP32-S3-LCD-1.54): no scroll buttons.

@@ -1,0 +1,6 @@
+{
+  "title": "M5Stack M5StickS3",
+  "summary": "135x240 ST7789 display, ES8311 microphone/speaker, two buttons and M5PM1 power management.",
+  "docs": "docs/hardware.md#m5stack-m5sticks3",
+  "ready_made": true
+}

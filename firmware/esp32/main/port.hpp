@@ -20,6 +20,7 @@
 #include "cores3.hpp"
 #include "driver/i2c_master.h"
 #include "driver/i2s_std.h"
+#include "audio_codec_gpio_if.h"
 #include "esp_codec_dev.h"
 #include "esp_adc/adc_oneshot.h"
 #include "esp_adc/adc_cali.h"
@@ -225,7 +226,8 @@ i2c_master_bus_handle_t bus(const I2cBusConfig& cfg);
 class CodecAudio {
  public:
   static constexpr uint32_t kRate = 16000;
-  bool begin(const CodecAudioConfig& cfg, i2c_master_bus_handle_t bus);
+  bool begin(const CodecAudioConfig& cfg, i2c_master_bus_handle_t bus,
+             const audio_codec_gpio_if_t* gpio_if = nullptr);
   esp_codec_dev_handle_t out() const { return out_; }
   esp_codec_dev_handle_t in() const { return in_; }
 
@@ -236,19 +238,20 @@ class CodecAudio {
 
 class CodecMic final : public hg::AudioIn {
  public:
-  bool begin(esp_codec_dev_handle_t dev);
+  bool begin(esp_codec_dev_handle_t dev, bool stereo = false);
   bool start(uint32_t sample_rate) override;
   void stop() override { capturing_ = false; }
 
  private:
   static void task(void* arg);
   esp_codec_dev_handle_t dev_ = nullptr;
+  bool stereo_ = false;
   std::atomic<bool> capturing_{false};
 };
 
 class CodecSpeaker final : public hg::AudioOut {
  public:
-  bool begin(esp_codec_dev_handle_t dev);
+  bool begin(esp_codec_dev_handle_t dev, bool stereo = false);
   bool begin(uint32_t sample_rate) override;
   void write(const int16_t* samples, size_t count) override;
   void end() override;
@@ -259,6 +262,7 @@ class CodecSpeaker final : public hg::AudioOut {
  private:
   static void task(void* arg);
   esp_codec_dev_handle_t dev_ = nullptr;
+  bool stereo_ = false;
   StreamBufferHandle_t buffer_ = nullptr;
   std::atomic<bool> open_{false};
   std::atomic<bool> draining_{false};
@@ -296,6 +300,27 @@ class AxpPower final : public hg::Power {
  private:
   i2c_master_dev_handle_t dev_ = nullptr;
   std::unique_ptr<hg::Axp2101> chip_;
+};
+
+class StickS3Board {
+ public:
+  // Powers the StickS3 LCD/audio rail through the M5PM1.
+  bool begin(i2c_master_bus_handle_t bus);
+
+  // Controls the AW8737 speaker amplifier through M5PM1.
+  bool set_speaker_amp(bool enabled);
+
+  // The ES8311 codec driver calls this interface when opening and closing the
+  // speaker. The physical PA pin is M5PM1 GPIO3, not an ESP32 GPIO.
+  const audio_codec_gpio_if_t* audio_gpio();
+
+ private:
+  static int gpio_setup(int16_t gpio, audio_gpio_dir_t dir, audio_gpio_mode_t mode);
+  static int gpio_set(int16_t gpio, bool high);
+  static bool gpio_get(int16_t gpio);
+  bool read(uint8_t reg, uint8_t& value);
+  bool update(uint8_t reg, uint8_t mask, bool enabled);
+  i2c_master_dev_handle_t pmic_ = nullptr;
 };
 
 class CoreS3Board {
@@ -381,7 +406,7 @@ class Wifi {
  private:
   static void on_event(void* arg, const char* base, int32_t id, void* data);
   static esp_err_t setup_http(httpd_req_t* request);
-  void join(const char* ssid, const char* password);
+  bool join(const char* ssid, const char* password);
   void setup_status(std::string status);
   NvsStorage* storage_ = nullptr;
   bool configured_ = false;
@@ -409,6 +434,10 @@ struct Parts {
   bool touch = false;
   bool key = false;
   i2c_master_bus_handle_t i2c = nullptr;  // scanned by `diag`
+  // Some devices (notably M5PM1) do not tolerate an exhaustive address scan.
+  // When set, diagnostics probe only these known board addresses.
+  const uint8_t* i2c_addresses = nullptr;
+  size_t i2c_address_count = 0;
 };
 
 // Starts keeping a RAM copy of recent log lines. Call first in app_main.

@@ -3,12 +3,15 @@
 
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_timer.h"
 #include "esp_wifi.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "sdkconfig.h"
 #include "lwip/inet.h"
 
@@ -30,28 +33,101 @@ void Wifi::begin(NvsStorage& storage) {
   ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &Wifi::on_event, this));
   ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &Wifi::on_event, this));
   ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
-  ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_MIN_MODEM));
+  wifi_country_t country = {};
+  std::memcpy(country.cc, "IN", 2);
+  country.schan = 1;
+  country.nchan = 13;
+  country.policy = WIFI_COUNTRY_POLICY_MANUAL;
+  ESP_ERROR_CHECK(esp_wifi_set_country(&country));
+  // Keep the radio fully awake.  This matches the known-good StickS3 port and
+  // avoids AP-specific disconnects while the station is being brought up.
+  ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE));
   ESP_ERROR_CHECK(esp_wifi_start());
 }
 
-void Wifi::join(const char* ssid, const char* password) {
+bool Wifi::join(const char* ssid, const char* password) {
   configured_ = false;
   retry_at_ = 0;
-  esp_wifi_disconnect();
+  const esp_err_t disconnect_err = esp_wifi_disconnect();
+  if (disconnect_err == ESP_OK) vTaskDelay(pdMS_TO_TICKS(500));
   const size_t ssid_size = std::strlen(ssid), pass_size = std::strlen(password);
+  ESP_LOGI("hg.wifi", "configuring station (%u-byte SSID, %u-byte credential)",
+           static_cast<unsigned>(ssid_size), static_cast<unsigned>(pass_size));
   if (!ssid_size || ssid_size > 32 || pass_size > 64) {
+    ESP_LOGE("hg.wifi", "saved Wi-Fi setting length is invalid");
     events::post(EventType::NetDown, "Wi-Fi not configured", 20);
-    return;
+    return false;
   }
   wifi_config_t cfg = {};
   std::memcpy(cfg.sta.ssid, ssid, ssid_size);
   std::memcpy(cfg.sta.password, password, pass_size);
-  cfg.sta.threshold.authmode = pass_size ? WIFI_AUTH_WPA2_PSK : WIFI_AUTH_OPEN;
+  // A password does not imply WPA2 specifically: modern access points may be
+  // WPA2/WPA3 transition or WPA3-only. Let the driver select any compatible
+  // personal-network mode and use the password when the AP requests it.
+  cfg.sta.threshold.authmode = WIFI_AUTH_OPEN;
+  cfg.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+  cfg.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
   cfg.sta.pmf_cfg.capable = true;
-  if (esp_wifi_set_config(WIFI_IF_STA, &cfg) != ESP_OK) return;
+
+  wifi_scan_config_t scan = {};
+  scan.show_hidden = true;
+  scan.scan_type = WIFI_SCAN_TYPE_ACTIVE;
+  bool scan_completed = false;
+  bool target_visible = false;
+  const esp_err_t scan_err = esp_wifi_scan_start(&scan, true);
+  if (scan_err == ESP_OK) {
+    scan_completed = true;
+    uint16_t count = 0;
+    esp_wifi_scan_get_ap_num(&count);
+    std::vector<wifi_ap_record_t> records(count);
+    if (count && esp_wifi_scan_get_ap_records(&count, records.data()) == ESP_OK) {
+      const wifi_ap_record_t* strongest = nullptr;
+      for (const auto& record : records) {
+        const size_t record_ssid_size = strnlen(reinterpret_cast<const char*>(record.ssid),
+                                                sizeof(record.ssid));
+        if (record_ssid_size == ssid_size && std::memcmp(record.ssid, ssid, ssid_size) == 0 &&
+            (!strongest || record.rssi > strongest->rssi)) strongest = &record;
+      }
+      if (strongest) {
+        target_visible = true;
+        std::memcpy(cfg.sta.bssid, strongest->bssid, sizeof(cfg.sta.bssid));
+        cfg.sta.bssid_set = true;
+        cfg.sta.channel = strongest->primary;
+        cfg.sta.scan_method = WIFI_FAST_SCAN;
+        ESP_LOGI("hg.wifi", "configured network visible on channel %u at %d dBm", strongest->primary,
+                 strongest->rssi);
+      } else {
+        ESP_LOGW("hg.wifi", "scan saw %u access points; configured network was absent", count);
+      }
+    } else {
+      ESP_LOGW("hg.wifi", "scan saw no access points");
+    }
+  } else {
+    ESP_LOGW("hg.wifi", "Wi-Fi scan failed: %s", esp_err_to_name(scan_err));
+  }
+  // Reconfiguration can race the asynchronous disconnect above.  Wait for the
+  // driver to finish tearing down the old association instead of silently
+  // abandoning the new credentials.
+  esp_err_t err = ESP_OK;
+  for (int attempt = 0; attempt < 30; ++attempt) {
+    err = esp_wifi_set_config(WIFI_IF_STA, &cfg);
+    if (err != ESP_ERR_WIFI_STATE) break;
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+  if (err != ESP_OK) {
+    ESP_LOGE("hg.wifi", "set config failed: %s", esp_err_to_name(err));
+    retry_at_ = now_ms() + 3000;
+    return !scan_completed || target_visible;
+  }
   configured_ = true;
   events::post(EventType::NetDown, "Joining Wi-Fi", 13);
-  if (esp_wifi_connect() != ESP_OK) retry_at_ = now_ms() + 3000;
+  ESP_LOGI("hg.wifi", "starting station connection");
+  const esp_err_t connect_err = esp_wifi_connect();
+  if (connect_err != ESP_OK) {
+    ESP_LOGW("hg.wifi", "connect start failed: %s", esp_err_to_name(connect_err));
+    retry_at_ = now_ms() + 3000;
+  }
+  return !scan_completed || target_visible;
 }
 
 void Wifi::reconfigure() {
@@ -59,8 +135,8 @@ void Wifi::reconfigure() {
   candidate_ = {};
   const std::string ssid = storage_->get("wifi_ssid").value_or(CONFIG_HG_DEFAULT_WIFI_SSID);
   const std::string pass = storage_->get("wifi_pass").value_or(CONFIG_HG_DEFAULT_WIFI_PASSWORD);
-  auto_setup_ = ssid.empty() && !auto_setup_tried_;
-  join(ssid.c_str(), pass.c_str());
+  const bool target_visible = join(ssid.c_str(), pass.c_str());
+  auto_setup_ = (!target_visible || ssid.empty()) && !auto_setup_tried_;
 }
 
 void Wifi::disconnected() {
@@ -121,7 +197,8 @@ void Wifi::tick(hg::App& app, uint32_t now) {
 
 void Wifi::on_event(void*, const char* base, int32_t id, void* data) {
   if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-    events::post(EventType::WifiStarted);
+    // app_main starts the saved-network join after all drivers and the app are
+    // ready. Doing it from this early callback can lose the one-shot event.
   } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
     auto* info = static_cast<wifi_event_sta_disconnected_t*>(data);
     char detail[48];

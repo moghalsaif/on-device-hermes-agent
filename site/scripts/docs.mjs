@@ -2,10 +2,10 @@ import { Marked } from "marked";
 import { readFile, writeFile, mkdir, cp, readdir, stat } from "node:fs/promises";
 import { join, posix } from "node:path";
 
-const REPO = "https://github.com/Adolanium/hermes-gadget-sdk";
+const REPO = "https://github.com/moghalsaif/on-device-hermes-agent";
 export const groups = [
-  ["Get started", [["getting-started", "Choose your path"], ["supported-hardware", "Supported hardware"], ["desktop", "Try the simulator"], ["setup-board", "Set up a board"], ["linux", "Run a Linux gadget"], ["connect-hermes", "Connect Hermes"]]],
-  ["Use your gadget", [["using-gadget", "Talk, type, and interrupt"], ["tailscale-funnel", "Connect from another network"], ["troubleshooting", "Fix a problem"], ["simulator", "Simulator controls"]]],
+  ["Get started", [["getting-started", "Choose your path"], ["m5sticks3-install-guide", "Install on M5StickS3"], ["supported-hardware", "Supported hardware"], ["desktop", "Try the simulator"], ["setup-board", "Set up a board"], ["linux", "Run a Linux gadget"], ["connect-hermes", "Connect Hermes"]]],
+  ["Use your gadget", [["using-gadget", "Talk, type, and interrupt"], ["standalone-hermes", "Run without your laptop"], ["tailscale-funnel", "Connect from another network"], ["sticks3-troubleshooting", "Fix a StickS3 problem"], ["troubleshooting", "Fix another problem"], ["simulator", "Simulator controls"]]],
   ["Build with the SDK", [["development", "Development and tests"], ["porting", "Add a board or action"], ["home-automation", "Home Assistant and MQTT"], ["faces", "Customize the face"], ["hardware", "Hardware and wiring"]]],
   ["Reference", [["hardware-validation", "Hardware verification"], ["protocol", "Protocol"], ["architecture", "Architecture"], ["hermes-integration", "Hermes integration"]]],
 ];

@@ -1,121 +1,159 @@
-<p align="center">
-  <img src="docs/images/logo.png" width="64" alt="Hermes Gadget logo">
-</p>
+![Hermes connected to an M5StickS3](assets/readme/hermes-sticks3-banner.png)
 
-<h1 align="center">Hermes Gadget</h1>
+# On-device Hermes Agent for M5StickS3 and ESP32
 
-<p align="center">
-  <b>Hold a button. Ask Hermes. Hear the answer.</b><br>
-  A small device for your own <a href="https://github.com/NousResearch/hermes-agent">Hermes Agent</a>, with its tools, memory, and skills.
-</p>
+A working, source-buildable Hermes Gadget firmware port for the **M5Stack M5StickS3 (K150)**, plus a practical installation and troubleshooting guide.
 
-<p align="center">
-  <a href="https://adolanium.github.io/hermes-gadget-sdk/installer.html"><b>Set up a board</b></a> ·
-  <a href="docs/desktop.md"><b>Try the simulator</b></a> ·
-  <a href="docs/getting-started.md">Read the docs</a>
-</p>
+This repository is based on [Adolanium/hermes-gadget-sdk](https://github.com/Adolanium/hermes-gadget-sdk). It adds the StickS3 board profile and the hardware fixes required for its display, M5PM1 power controller, ES8311 microphone and speaker codec, AW8737 amplifier, buttons, Wi-Fi, and spoken Hermes replies.
 
-<p align="center">
-  <img src="docs/images/screen-ready.png" width="226" alt="The round simulator display, ready for a question">
-  <br><sub>The desktop simulator runs the same device core. No board needed to try it.</sub>
-</p>
+> **Status:** Experimental but physically exercised on one M5StickS3 K150. Display, buttons, Wi-Fi, microphone transcription, text responses, Piper speech synthesis, and onboard speaker playback have worked together. A full long-duration hardware verification report is still pending.
 
-## Choose your starting point
+## What works
 
-| I have a board | I want to try it first | I want to build with it |
-|---|---|---|
-| [Open the browser installer](https://adolanium.github.io/hermes-gadget-sdk/installer.html) | [Start the desktop simulator](docs/desktop.md) | [Explore the SDK](docs/development.md) |
-| Install over USB, connect Wi-Fi, and pair with your Hermes. | Try a scripted demo, then connect your own Hermes. | Add a board, device actions, sensors, or your own face. |
-| Chrome or Edge, a USB data cable, 2.4 GHz Wi-Fi, and Hermes. No firmware toolchain. | Python 3.10+, CMake 3.16+, and a C++17 compiler. | Start with the development guide and tests. |
-
-## What you can do
-
-- **Talk and listen.** Hold TALK to speak, release to send, and hear your Hermes reply.
-- **See what is happening.** Read replies, answer confirmation questions, and receive cards from your agent.
-- **Let Hermes act.** Expose the gadget's LEDs, sensors, and other controls as agent tools.
-
-Your Hermes does the thinking. Real conversations need Hermes Agent and the Gadget plugin. Voice also needs speech recognition and text-to-speech configured. The demo server gives scripted replies. Follow [Connect Hermes](docs/connect-hermes.md) when you are ready.
-
-## Supported hardware
-
-Hermes Gadget runs on ESP32-S3 boards and Raspberry Pi 4/5, with a desktop simulator for trying it without hardware. See [Supported hardware](docs/supported-hardware.md) to compare boards, controls, audio, and setup options.
-
-Hardware ports remain experimental until a complete physical verification report is recorded for the exact revision. Check the [verification table](docs/hardware-validation.md) before choosing a board.
-
-## Try the demo from a checkout
-
-<details>
-<summary>Already have Python, CMake, and a compiler? Start here.</summary>
-
-In your activated environment at the repository root:
-
-```bash
-python -m pip install -e ".[dev]"
-hermes-gadget build-sim --test
-hermes-gadget devserver --pairing
-```
-
-In a second terminal with the same environment activated:
-
-```bash
-hermes-gadget sim --url ws://127.0.0.1:8765/gadget --board sim-466x466-round
-```
-
-Type `approve <CODE>` in the first terminal, using the code on the device. Type a message in the simulator to receive a streamed echo. The [desktop guide](docs/desktop.md) covers platform-specific prerequisites and live audio.
-
-</details>
-
-## On the screen
-
-| Ready | Listening | Thinking | Speaking |
-|:---:|:---:|:---:|:---:|
-| ![Ready](docs/images/screen-ready.png) | ![Listening](docs/images/screen-listening.png) | ![Thinking](docs/images/screen-thinking.png) | ![Speaking](docs/images/screen-speaking.png) |
-
-These images show the simulator's device display. The [simulator guide](docs/simulator.md) covers its desktop controls, board profiles, and scripted runs.
-
-## Find the right guide
-
-| Use a gadget | Build with the SDK |
+| Capability | Status |
 |---|---|
-| [Choose a starting point](docs/getting-started.md) | [Development and tests](docs/development.md) |
-| [Set up a board](docs/setup-board.md) | [Add a board, actions, or sensors](docs/porting.md) |
-| [Try the simulator](docs/desktop.md) | [Customize the face](docs/faces.md) |
-| [Run a Linux gadget](docs/linux.md) | [Hardware verification](docs/hardware-validation.md) |
-| [Connect Hermes](docs/connect-hermes.md) | [Architecture](docs/architecture.md) |
-| [Talk, type, and interrupt](docs/using-gadget.md) | [Protocol](docs/protocol.md) |
-| [Change Wi-Fi or update firmware](docs/setup-board.md#manage-an-existing-gadget) | [Hermes integration reference](docs/hermes-integration.md) |
-| [Remote access with Tailscale Funnel](docs/tailscale-funnel.md) | |
-| [Troubleshooting](docs/troubleshooting.md) | [Hardware and wiring](docs/hardware.md) |
+| ST7789 135×240 display | Working |
+| Front TALK button | Working |
+| Side AUX/CANCEL button | Working |
+| Wi-Fi and phone setup | Working |
+| Hermes pairing and reconnect | Working |
+| ES8311 onboard microphone | Working |
+| ES8311 + AW8737 onboard speaker | Working |
+| Local Piper text-to-speech | Working |
+| Local faster-whisper speech recognition | Working |
+| Battery readings and software power-off | Not implemented |
 
-## Project status
+## Architecture
 
-See the [changelog](CHANGELOG.md) for release highlights and contributor credits.
+The StickS3 is the voice terminal, not the AI computer:
 
-[Releases](https://github.com/Adolanium/hermes-gadget-sdk/releases/latest) include prebuilt firmware for the profiles listed in that release. Newly merged profiles need a source build until the next release. After the first USB flash, `hermes gadget update` installs new firmware over the air. A build that cannot reach Hermes rolls itself back.
+```text
+M5StickS3 microphone
+        ↓
+Wi-Fi → Hermes Gadget gateway → speech recognition → Hermes model
+        ↑                                      ↓
+M5StickS3 speaker ← streamed PCM audio ← text-to-speech
+```
 
-The simulator and firmware share a portable C++17 core. CI tests the core, Python tools, installer, and plugin against a real Hermes gateway, and builds every supported board. The [development guide](docs/development.md) describes the test suites and pinned Hermes version.
+Hermes currently runs on a Mac, Linux computer, home server, or another always-on host. For a portable device that works away from your laptop, see [Run Hermes independently](docs/standalone-hermes.md).
 
-After installing firmware, you can [configure Wi-Fi from your phone](docs/setup-board.md#set-up-wi-fi-with-your-phone) through the gadget's temporary network. USB setup remains available. Wake-word activation is not included.
+## Quick start
 
-The [Home Assistant and MQTT examples](docs/home-automation.md) expose a configured lamp and temperature sensor through a Linux gadget. They include pairing instructions, fixed action targets, asynchronous completion and local integration tests.
+You need:
 
-[![CI](https://github.com/Adolanium/hermes-gadget-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/Adolanium/hermes-gadget-sdk/actions/workflows/ci.yml)
-[![Hermes integration](https://github.com/Adolanium/hermes-gadget-sdk/actions/workflows/hermes.yml/badge.svg)](https://github.com/Adolanium/hermes-gadget-sdk/actions/workflows/hermes.yml)
+- An exact M5Stack M5StickS3 K150—not a StickC or StickC Plus model.
+- A data-capable USB-C cable.
+- Python 3.10 or newer and [PlatformIO Core](https://docs.platformio.org/en/latest/core/installation/index.html).
+- Hermes Agent installed and logged in on the gateway computer.
+- A 2.4 GHz Wi-Fi network. The StickS3 does not join 5 GHz-only or enterprise networks.
 
-## Contributing
+Clone and install the local tools:
 
-Bug reports from real boards, new boards, fixes, and docs are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md). Report security problems privately through [SECURITY.md](SECURITY.md).
+```bash
+git clone https://github.com/moghalsaif/on-device-hermes-agent.git
+cd on-device-hermes-agent
+python3 -m pip install -e ".[serial]"
+```
 
-## Affiliation and trademarks
+Build and flash:
 
-Hermes Gadget is an **independent, community-made project**. It is not affiliated with, endorsed by, sponsored by or supported by Nous Research.
+```bash
+cd firmware/esp32
+pio run -e m5stack-sticks3
+pio run -e m5stack-sticks3 -t upload --upload-port /dev/cu.usbmodem101
+```
 
-"Hermes", "Hermes Agent", "Nous Research" and the Hermes Agent mascot (the girl with the headphones, sometimes called "Nous Girl") are trademarks or brand assets of Nous Research. They appear here only to describe compatibility with Hermes Agent.
+Use the serial port shown on your computer. Common names are `/dev/cu.usbmodem…` on macOS, `/dev/ttyACM…` on Linux, and `COM…` on Windows.
+
+Install the matching Hermes plugin on the gateway computer:
+
+```bash
+hermes plugins install https://github.com/moghalsaif/on-device-hermes-agent/tree/main/plugin --enable
+hermes gateway setup
+hermes gadget info
+```
+
+Keep the gateway running. After the first flash, the StickS3 displays a temporary `Hermes-XXXX` Wi-Fi network and password. Join it from a phone, keep the network selected when the phone warns that it has no internet, and open:
+
+```text
+http://192.168.4.1
+```
+
+Enter the 2.4 GHz network, its password, and the complete gateway address printed by `hermes gadget info`. Pair the device when its code appears:
+
+```bash
+hermes gadget pair
+```
+
+For the complete walkthrough, expected diagnostics, and recovery steps, read [Install Hermes on the StickS3](docs/m5sticks3-install-guide.md).
+
+## Enable speech
+
+In Hermes, configure:
+
+- Speech-to-text: local faster-whisper, with the `base` model as a practical starting point.
+- Text-to-speech: Piper.
+- Automatic TTS for Gadget replies.
+
+The interactive route is:
+
+```bash
+hermes tools
+hermes setup
+```
+
+On Hermes versions that expose the post-setup helpers, these commands install the local engines:
+
+```bash
+hermes tools post-setup faster_whisper
+hermes tools post-setup piper
+```
+
+Restart the Hermes gateway after changing speech providers. The first transcription downloads the selected recognition model and can take longer than later requests.
+
+## Hardware details
+
+| Part | StickS3 connection |
+|---|---|
+| Display | ST7789 over SPI; MOSI 39, SCLK 40, CS 41, DC 45, RESET 21, backlight 38 |
+| I²C | SDA 47, SCL 48, 100 kHz, external pull-ups |
+| ES8311 | Address `0x18`; MCLK 18, BCLK 17, WS 15, DOUT 14, DIN 16 |
+| M5PM1 | Address `0x6e`; GPIO2 supplies LCD/audio and GPIO3 enables the AW8737 amplifier |
+| Buttons | Front TALK 11; side AUX/CANCEL 12 |
+
+The complete implementation is in:
+
+- [`firmware/esp32/main/port_sticks3.cpp`](firmware/esp32/main/port_sticks3.cpp)
+- [`firmware/esp32/main/port_codec.cpp`](firmware/esp32/main/port_codec.cpp)
+- [`firmware/esp32/main/board.cpp`](firmware/esp32/main/board.cpp)
+- [`firmware/esp32/boards/m5stack-sticks3/`](firmware/esp32/boards/m5stack-sticks3/)
+
+## Problems already solved by this port
+
+- M5PM1 I²C timeouts and “bus stuck” diagnostics.
+- Powering the LCD and audio rail in the correct order.
+- Avoiding a full I²C scan that can upset the M5PM1.
+- Converting the ES8311 duplex stereo stream to Hermes mono audio.
+- Enabling the external AW8737 amplifier through M5PM1 GPIO3.
+- Preventing the speaker playback task from overflowing its stack.
+- Recovering from Wi-Fi reason 201 and changing networks through phone setup.
+- Installing missing Piper and faster-whisper runtime components.
+
+See [StickS3 troubleshooting](docs/sticks3-troubleshooting.md) for symptoms, causes, and fixes.
+
+## Other ESP32 boards
+
+The underlying Hermes Gadget SDK supports several ESP32-S3 devices and custom boards. Start with [supported hardware](docs/supported-hardware.md), then use [the porting guide](docs/porting.md) for a new display, codec, microphone, speaker, or button layout.
+
+Do not flash the StickS3 profile onto a different M5Stack model merely because its enclosure looks similar. Pins, flash layout, power controllers, and displays differ.
+
+## Security
+
+- Never commit Wi-Fi passwords, device keys, tokens, pairing codes, or private transcripts.
+- Use `wss://` for a gateway reachable outside a trusted local network.
+- Verify the pairing code on the physical display before approving a device.
+- Sanitize diagnostics before publishing them.
 
 ## License
 
-Project code and documentation are licensed under the [MIT license](LICENSE).
-
-Third-party dependencies, adapted drivers, and artwork retain their respective licenses. See [Third-party licenses and attribution](THIRD_PARTY_NOTICES.md) and [NOTICE](NOTICE) for details.
-
-The MIT license grants no rights to Nous Research's names or marks.
+This project preserves the upstream history and licensing of [Hermes Gadget SDK](https://github.com/Adolanium/hermes-gadget-sdk). M5StickS3 hardware facts follow [M5Stack’s StickS3 documentation](https://docs.m5stack.com/en/core/StickS3) and its K150 schematic. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

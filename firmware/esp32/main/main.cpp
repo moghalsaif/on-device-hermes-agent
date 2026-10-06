@@ -34,6 +34,7 @@ hgp::EspUpdater g_updater;
 hgp::AxpPower g_power;
 hgp::LatchPower g_latch_power;
 hgp::CoreS3Board g_cores3;
+hgp::StickS3Board g_sticks3;
 hg::TouchGestures* g_gestures = nullptr;
 
 // touch_cancel: which inputs act as CANCEL on touch boards.
@@ -172,7 +173,17 @@ extern "C" void app_main(void) {
   if (latch_power) hal.power = &g_latch_power;
   if (g_updater.capacity()) hal.updater = &g_updater;
   i2c_master_bus_handle_t i2c_bus = hgp::i2c::bus(board.i2c);
-  const bool peripherals_ready = !board.cores3 || g_cores3.begin(i2c_bus);
+
+#if CONFIG_HG_BOARD_STICKS3
+  const bool sticks3_ready = g_sticks3.begin(i2c_bus);
+  const audio_codec_gpio_if_t* codec_gpio = sticks3_ready ? g_sticks3.audio_gpio() : nullptr;
+#else
+  constexpr bool sticks3_ready = true;
+  constexpr const audio_codec_gpio_if_t* codec_gpio = nullptr;
+#endif
+
+  const bool peripherals_ready =
+      sticks3_ready && (!board.cores3 || g_cores3.begin(i2c_bus));
   if (board.cores3 && peripherals_ready)
     g_display.board_backlight = [](uint8_t percent) { g_cores3.set_backlight(percent); };
   if (peripherals_ready && board.lcd.enabled) {
@@ -189,9 +200,9 @@ extern "C" void app_main(void) {
   if (board.axp2101 && g_power.begin(i2c_bus)) hal.power = &g_power;
   const bool audio_power = peripherals_ready && (!board.axp_audio_supply || g_power.enable_audio_supply());
   if (!audio_power) ESP_LOGE(TAG, "audio supply unavailable");
-  if (board.codec.enabled && audio_power && g_codec.begin(board.codec, i2c_bus)) {
-    if (g_codec_mic.begin(g_codec.in())) hal.mic = &g_codec_mic;
-    if (g_codec_speaker.begin(g_codec.out())) hal.speaker = &g_codec_speaker;
+  if (board.codec.enabled && audio_power && g_codec.begin(board.codec, i2c_bus, codec_gpio)) {
+    if (g_codec_mic.begin(g_codec.in(), board.codec.duplex_es8311)) hal.mic = &g_codec_mic;
+    if (g_codec_speaker.begin(g_codec.out(), board.codec.duplex_es8311)) hal.speaker = &g_codec_speaker;
   }
   g_buttons.begin(board.buttons);
   const bool touch = peripherals_ready && (board.touch.enabled || board.pwr_key.enabled) &&
@@ -202,13 +213,19 @@ extern "C" void app_main(void) {
                       : hal.display == &g_parallel ? "st7789-i80"
                       : hal.display == &g_amoled ? "co5300"
                                                 : "none";
-  parts.mic = hal.mic == &g_codec_mic ? "es7210" : hal.mic == &g_mic ? "i2s" : "none";
+  parts.mic = hal.mic == &g_codec_mic ? (board.codec.duplex_es8311 ? "es8311" : "es7210")
+                                      : hal.mic == &g_mic ? "i2s" : "none";
   parts.speaker = hal.speaker == &g_codec_speaker ?
       (board.codec.speaker == hgp::SpeakerCodec::Aw88298 ? "aw88298" : "es8311") :
       hal.speaker == &g_speaker ? "i2s" : "none";
   parts.touch = touch && g_touch.has_touch();
   parts.key = touch && g_touch.has_key();
   parts.i2c = i2c_bus;
+#if CONFIG_HG_BOARD_STICKS3
+  static constexpr uint8_t stick_i2c_addresses[] = {0x18, 0x6e};
+  parts.i2c_addresses = stick_i2c_addresses;
+  parts.i2c_address_count = sizeof(stick_i2c_addresses);
+#endif
   hgp::diag::set_parts(parts);
   hgp::diag::log_boot_summary();
 
@@ -246,6 +263,10 @@ extern "C" void app_main(void) {
   };
   app.recent_log = &hgp::diag::recent_log;
   app.begin();
+  // The driver's STA_START callback can run while the rest of the board is
+  // still initializing. Start the saved-network join explicitly once the app
+  // is ready instead of depending on that one-shot event surviving startup.
+  g_wifi.reconfigure();
   hgp::console::begin();
 
   for (;;) {
