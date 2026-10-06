@@ -1,6 +1,6 @@
 ![Hermes connected to an M5StickS3](assets/readme/hermes-sticks3-banner.png)
 
-# On-device Hermes Agent for M5StickS3 and ESP32
+# On-device Hermes Agent for M5StickS3 - ESP32
 
 A working, source-buildable Hermes Gadget firmware port for the **M5Stack M5StickS3 (K150)**, plus a practical installation and troubleshooting guide.
 
