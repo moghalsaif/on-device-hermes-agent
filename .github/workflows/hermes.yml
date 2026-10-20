@@ -46,7 +46,7 @@ jobs:
       - name: Show the Hermes commit under test
         working-directory: hermes-agent
         run: git log -1 --format='Hermes Agent %H (%cs) %s'
-      - uses: astral-sh/setup-uv@v10.2.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
           enable-cache: true
           cache-dependency-glob: hermes-agent/uv.lock
